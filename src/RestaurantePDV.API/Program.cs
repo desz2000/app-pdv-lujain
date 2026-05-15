@@ -51,6 +51,17 @@ using (var scope = app.Services.CreateScope())
     // Substitui pelo indice unico filtrado (status=0 = Aberta), pra permitir reuso de numero.
     db.Database.ExecuteSqlRaw("DROP INDEX IF EXISTS \"IX_Comandas_Numero\";");
     db.Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_Comandas_Numero_Aberta\" ON \"Comandas\" (\"Numero\") WHERE \"Status\" = 0;");
+
+    // Migracao leve pra DB existente sem a coluna Quantidade em ItensComanda.
+    // SQLite nao tem "ADD COLUMN IF NOT EXISTS", entao checa o pragma antes.
+    var temColuna = db.Database
+        .SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM pragma_table_info('ItensComanda') WHERE name = 'Quantidade'")
+        .AsEnumerable()
+        .FirstOrDefault();
+    if (temColuna == 0)
+    {
+        db.Database.ExecuteSqlRaw("ALTER TABLE \"ItensComanda\" ADD COLUMN \"Quantidade\" INTEGER NOT NULL DEFAULT 1;");
+    }
 }
 
 if (app.Environment.IsDevelopment())

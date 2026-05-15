@@ -186,6 +186,9 @@ tr.inativo { opacity: 0.6; }
 .acoes-encerrada { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
 .acoes-encerrada button { padding: 0.65rem 1rem; }
 .hint { font-size: 0.85rem; color: #6b7280; margin-top: 0.5rem; }
+.unit-hint { font-size: 0.85rem; color: #6b7280; }
+.qtde-input { max-width: 90px; }
+.preco-fixo-info { padding: 0.55rem 0.75rem; background: #ecfeff; border-radius: 6px; color: #0e7490; font-weight: 600; display: inline-flex; align-items: center; }
 
 .form-card { background: #fff; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; }
 .form-card h3 { margin-top: 0; }

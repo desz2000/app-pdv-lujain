@@ -20,6 +20,7 @@ public class ItemComandaDto
     public int Id { get; set; }
     public int? ProdutoId { get; set; }
     public string Descricao { get; set; } = string.Empty;
+    public int Quantidade { get; set; } = 1;
     public decimal Valor { get; set; }
     public DateTime AdicionadoEm { get; set; }
     public OrigemItem Origem { get; set; }
@@ -32,8 +33,12 @@ public class AdicionarItemRequest
     [StringLength(200)]
     public string? Descricao { get; set; }
 
-    [Range(0.01, 1_000_000)]
-    public decimal Valor { get; set; }
+    // Para produto preco fixo: ignorado (calculado como produto.Preco * Quantidade).
+    // Para produto por kilo ou item avulso: obrigatorio e usado como total da linha.
+    public decimal? Valor { get; set; }
+
+    [Range(1, 1000)]
+    public int Quantidade { get; set; } = 1;
 
     public OrigemItem Origem { get; set; } = OrigemItem.Caixa;
 }

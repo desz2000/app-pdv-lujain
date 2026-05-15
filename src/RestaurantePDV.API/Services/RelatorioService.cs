@@ -67,7 +67,7 @@ public class RelatorioService : IRelatorioService
             {
                 ProdutoId = g.Key.ProdutoId,
                 Descricao = g.Key.Descricao,
-                Quantidade = g.Count(),
+                Quantidade = g.Sum(i => i.Quantidade),
                 Total = g.Sum(i => i.Valor)
             })
             .OrderByDescending(t => t.Total)
