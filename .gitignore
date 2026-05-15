@@ -1,0 +1,24 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.vscode/
+*.swp
+
+# Build output
+out/
+publish/
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+logs/
+
+# Excel exports gerados em runtime
+relatorios-gerados/

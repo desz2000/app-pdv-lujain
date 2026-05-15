@@ -1,0 +1,67 @@
+@inject IPdvApi Api
+@inject PinState Pin
+
+<div class="login-card">
+    <h2>Acesso ao PDV</h2>
+    <p>Digite o PIN para continuar.</p>
+    <input type="password"
+           inputmode="numeric"
+           autocomplete="off"
+           class="pin-input"
+           @bind="pinDigitado"
+           @bind:event="oninput"
+           @onkeydown="OnKeyDown"
+           placeholder="PIN" />
+    <button class="primary" @onclick="ValidarAsync" disabled="@validando">
+        @(validando ? "Validando..." : "Entrar")
+    </button>
+    @if (!string.IsNullOrEmpty(erro))
+    {
+        <div class="erro">@erro</div>
+    }
+</div>
+
+@code {
+    private string pinDigitado = string.Empty;
+    private string? erro;
+    private bool validando;
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ValidarAsync();
+        }
+    }
+
+    private async Task ValidarAsync()
+    {
+        erro = null;
+        if (string.IsNullOrWhiteSpace(pinDigitado))
+        {
+            erro = "Digite o PIN.";
+            return;
+        }
+        validando = true;
+        try
+        {
+            var ok = await Api.ValidarPinAsync(pinDigitado);
+            if (ok)
+            {
+                Pin.Definir(pinDigitado);
+            }
+            else
+            {
+                erro = "PIN incorreto.";
+            }
+        }
+        catch (Exception ex)
+        {
+            erro = $"Falha ao validar: {ex.Message}";
+        }
+        finally
+        {
+            validando = false;
+        }
+    }
+}

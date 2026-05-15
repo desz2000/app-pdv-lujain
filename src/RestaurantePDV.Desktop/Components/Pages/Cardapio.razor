@@ -1,0 +1,214 @@
+@page "/cardapio"
+@inject IPdvApi Api
+@inject PinState Pin
+@implements IDisposable
+
+<PageTitle>Cardápio — PDV Lujain</PageTitle>
+
+@if (!Pin.Autenticado)
+{
+    <LoginPin />
+}
+else
+{
+    <h1>Cardápio</h1>
+
+    <section class="form-card">
+        <h3>@(editandoId is null ? "Novo produto" : $"Editando #{editandoId}")</h3>
+        <div class="form-row">
+            <input type="text" placeholder="Nome" @bind="formNome" />
+            <input type="number" step="0.01" min="0" placeholder="Preço" @bind="formPreco" />
+            <select @bind="formTipo">
+                <option value="@TipoProduto.PrecoFixo">Preço fixo</option>
+                <option value="@TipoProduto.PorKilo">Por kilo</option>
+            </select>
+            @if (editandoId is not null)
+            {
+                <label class="ativo">
+                    <input type="checkbox" @bind="formAtivo" /> Ativo
+                </label>
+            }
+            <button class="primary" @onclick="SalvarAsync">@(editandoId is null ? "Adicionar" : "Salvar")</button>
+            @if (editandoId is not null)
+            {
+                <button class="link" @onclick="CancelarEdicao">Cancelar</button>
+            }
+        </div>
+        @if (!string.IsNullOrEmpty(mensagem))
+        {
+            <div class="mensagem">@mensagem</div>
+        }
+    </section>
+
+    <section class="lista">
+        <div class="filtros">
+            <label>
+                <input type="checkbox" @bind="incluirInativos" @bind:event="oninput" @bind:after="CarregarAsync" />
+                Mostrar inativos
+            </label>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Tipo</th>
+                    <th class="right">Preço</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in produtos)
+                {
+                    <tr class="@(p.Ativo ? "" : "inativo")">
+                        <td>@p.Nome</td>
+                        <td>@(p.Tipo == TipoProduto.PorKilo ? "Por kilo" : "Preço fixo")</td>
+                        <td class="right">@p.Preco.ToString("C2", CulturaBR)</td>
+                        <td>@(p.Ativo ? "Ativo" : "Inativo")</td>
+                        <td>
+                            <button class="link" @onclick="() => EditarAsync(p)">Editar</button>
+                            @if (p.Ativo)
+                            {
+                                <button class="link" @onclick="() => InativarAsync(p.Id)">Inativar</button>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (produtos.Count == 0)
+                {
+                    <tr><td colspan="5" class="vazio">Nenhum produto cadastrado.</td></tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo CulturaBR = new("pt-BR");
+
+    private List<ProdutoDto> produtos = new();
+    private bool incluirInativos;
+
+    private int? editandoId;
+    private string formNome = string.Empty;
+    private decimal formPreco;
+    private TipoProduto formTipo = TipoProduto.PrecoFixo;
+    private bool formAtivo = true;
+
+    private string? mensagem;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Pin.Mudou += OnPinChanged;
+        if (Pin.Autenticado)
+        {
+            await CarregarAsync();
+        }
+    }
+
+    private async void OnPinChanged()
+    {
+        if (Pin.Autenticado)
+        {
+            await CarregarAsync();
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CarregarAsync()
+    {
+        try
+        {
+            produtos = await Api.ListarProdutosAsync(incluirInativos);
+        }
+        catch (Exception ex)
+        {
+            mensagem = $"Erro ao carregar: {ex.Message}";
+        }
+    }
+
+    private async Task SalvarAsync()
+    {
+        mensagem = null;
+        if (string.IsNullOrWhiteSpace(formNome))
+        {
+            mensagem = "Informe o nome.";
+            return;
+        }
+        if (formPreco < 0)
+        {
+            mensagem = "Preço inválido.";
+            return;
+        }
+        try
+        {
+            if (editandoId is null)
+            {
+                await Api.CriarProdutoAsync(new CriarProdutoRequest
+                {
+                    Nome = formNome,
+                    Preco = formPreco,
+                    Tipo = formTipo
+                });
+            }
+            else
+            {
+                await Api.AtualizarProdutoAsync(editandoId.Value, new AtualizarProdutoRequest
+                {
+                    Nome = formNome,
+                    Preco = formPreco,
+                    Tipo = formTipo,
+                    Ativo = formAtivo
+                });
+            }
+            LimparFormulario();
+            await CarregarAsync();
+        }
+        catch (Exception ex)
+        {
+            mensagem = $"Erro ao salvar: {ex.Message}";
+        }
+    }
+
+    private Task EditarAsync(ProdutoDto p)
+    {
+        editandoId = p.Id;
+        formNome = p.Nome;
+        formPreco = p.Preco;
+        formTipo = p.Tipo;
+        formAtivo = p.Ativo;
+        return Task.CompletedTask;
+    }
+
+    private void CancelarEdicao()
+    {
+        LimparFormulario();
+    }
+
+    private async Task InativarAsync(int id)
+    {
+        try
+        {
+            await Api.InativarProdutoAsync(id);
+            await CarregarAsync();
+        }
+        catch (Exception ex)
+        {
+            mensagem = $"Erro ao inativar: {ex.Message}";
+        }
+    }
+
+    private void LimparFormulario()
+    {
+        editandoId = null;
+        formNome = string.Empty;
+        formPreco = 0;
+        formTipo = TipoProduto.PrecoFixo;
+        formAtivo = true;
+    }
+
+    public void Dispose()
+    {
+        Pin.Mudou -= OnPinChanged;
+    }
+}

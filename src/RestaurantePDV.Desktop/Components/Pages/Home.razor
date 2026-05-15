@@ -1,0 +1,318 @@
+@page "/"
+@inject IPdvApi Api
+@inject PinState Pin
+@implements IDisposable
+
+<PageTitle>Caixa — PDV Lujain</PageTitle>
+
+@if (!Pin.Autenticado)
+{
+    <LoginPin />
+}
+else
+{
+    <h1>Caixa</h1>
+
+    <div class="caixa-grid">
+        <section class="busca">
+            <label>Número da comanda</label>
+            <input type="number"
+                   class="num-input"
+                   min="1"
+                   @bind="numeroDigitado"
+                   @bind:event="oninput"
+                   @onkeydown="OnNumeroKeyDown" />
+            <button class="primary" @onclick="BuscarAsync">Buscar / Abrir</button>
+            @if (!string.IsNullOrEmpty(mensagem))
+            {
+                <div class="mensagem">@mensagem</div>
+            }
+        </section>
+
+        @if (comanda is not null)
+        {
+            <section class="comanda">
+                <header>
+                    <h2>Comanda #@comanda.Numero</h2>
+                    <span class="status @comanda.Status.ToString().ToLowerInvariant()">@comanda.Status</span>
+                </header>
+
+                <div class="itens">
+                    @if (comanda.Itens.Count == 0)
+                    {
+                        <div class="vazio">Nenhum item ainda.</div>
+                    }
+                    else
+                    {
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Descrição</th>
+                                    <th>Origem</th>
+                                    <th class="right">Valor</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in comanda.Itens)
+                                {
+                                    <tr>
+                                        <td>@item.Descricao</td>
+                                        <td>@item.Origem</td>
+                                        <td class="right">@item.Valor.ToString("C2", CulturaBR)</td>
+                                        <td>
+                                            @if (comanda.Status == StatusComanda.Aberta)
+                                            {
+                                                <button class="link" @onclick="() => RemoverItemAsync(item.Id)">Remover</button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="2"><strong>Total</strong></td>
+                                    <td class="right total">@comanda.ValorTotal.ToString("C2", CulturaBR)</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    }
+                </div>
+
+                @if (comanda.Status == StatusComanda.Aberta)
+                {
+                    <div class="adicionar">
+                        <h3>Adicionar item</h3>
+                        <div class="form-row">
+                            <select @bind="produtoSelecionadoId">
+                                <option value="0">— produto avulso —</option>
+                                @foreach (var p in produtos)
+                                {
+                                    <option value="@p.Id">@p.Nome (@p.Preco.ToString("C2", CulturaBR))</option>
+                                }
+                            </select>
+                            <input type="text"
+                                   placeholder="Descrição (se avulso)"
+                                   @bind="descricaoAvulsa" />
+                            <input type="number"
+                                   step="0.01"
+                                   min="0"
+                                   placeholder="Valor"
+                                   @bind="valorItem"
+                                   @bind:event="oninput" />
+                            <button class="secondary" @onclick="AdicionarItemAsync">Adicionar</button>
+                        </div>
+                    </div>
+
+                    <div class="fechar">
+                        <h3>Finalizar — forma de pagamento</h3>
+                        <div class="formas">
+                            @foreach (var fp in FormasPagamento)
+                            {
+                                <button class="forma" @onclick="() => FecharAsync(fp)">
+                                    @FormatarFormaPagamento(fp)
+                                </button>
+                            }
+                        </div>
+                        <button class="cancelar" @onclick="CancelarAsync">Cancelar comanda</button>
+                    </div>
+                }
+                else
+                {
+                    <div class="encerrada">
+                        <p><strong>Comanda @comanda.Status.ToString().ToLowerInvariant()</strong></p>
+                        @if (comanda.FormaPagamento.HasValue)
+                        {
+                            <p>Forma de pagamento: @FormatarFormaPagamento(comanda.FormaPagamento.Value)</p>
+                        }
+                        @if (comanda.FechadaEm.HasValue)
+                        {
+                            <p>Em: @comanda.FechadaEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
+                        }
+                    </div>
+                }
+            </section>
+        }
+    </div>
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo CulturaBR = new("pt-BR");
+    private static readonly FormaPagamento[] FormasPagamento = new[]
+    {
+        FormaPagamento.Dinheiro,
+        FormaPagamento.Debito,
+        FormaPagamento.Credito,
+        FormaPagamento.Pix,
+        FormaPagamento.ValeRefeicao,
+        FormaPagamento.ValeAlimentacao
+    };
+
+    private int numeroDigitado;
+    private ComandaDto? comanda;
+    private List<ProdutoDto> produtos = new();
+    private int produtoSelecionadoId;
+    private string descricaoAvulsa = string.Empty;
+    private decimal valorItem;
+    private string? mensagem;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Pin.Mudou += OnPinChanged;
+        if (Pin.Autenticado)
+        {
+            await CarregarProdutosAsync();
+        }
+    }
+
+    private async void OnPinChanged()
+    {
+        if (Pin.Autenticado)
+        {
+            await CarregarProdutosAsync();
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CarregarProdutosAsync()
+    {
+        try
+        {
+            produtos = await Api.ListarProdutosAsync();
+        }
+        catch (Exception ex)
+        {
+            mensagem = $"Erro ao carregar produtos: {ex.Message}";
+        }
+    }
+
+    private async Task OnNumeroKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await BuscarAsync();
+        }
+    }
+
+    private async Task BuscarAsync()
+    {
+        mensagem = null;
+        if (numeroDigitado <= 0)
+        {
+            mensagem = "Digite um número de comanda válido.";
+            return;
+        }
+        try
+        {
+            comanda = await Api.ObterComandaAsync(numeroDigitado);
+            if (comanda is null)
+            {
+                mensagem = $"Comanda {numeroDigitado} ainda não tem itens. Adicione o primeiro para abrir.";
+                comanda = new ComandaDto { Numero = numeroDigitado, Status = StatusComanda.Aberta };
+            }
+        }
+        catch (Exception ex)
+        {
+            mensagem = $"Erro ao buscar: {ex.Message}";
+        }
+    }
+
+    private async Task AdicionarItemAsync()
+    {
+        if (comanda is null)
+        {
+            return;
+        }
+        if (valorItem <= 0)
+        {
+            mensagem = "Valor deve ser maior que zero.";
+            return;
+        }
+        try
+        {
+            var request = new AdicionarItemRequest
+            {
+                ProdutoId = produtoSelecionadoId > 0 ? produtoSelecionadoId : null,
+                Descricao = string.IsNullOrWhiteSpace(descricaoAvulsa) ? null : descricaoAvulsa,
+                Valor = valorItem,
+                Origem = OrigemItem.Caixa
+            };
+            comanda = await Api.AdicionarItemAsync(comanda.Numero, request);
+            descricaoAvulsa = string.Empty;
+            valorItem = 0;
+            produtoSelecionadoId = 0;
+            mensagem = null;
+        }
+        catch (Exception ex)
+        {
+            mensagem = $"Erro ao adicionar: {ex.Message}";
+        }
+    }
+
+    private async Task RemoverItemAsync(int itemId)
+    {
+        if (comanda is null)
+        {
+            return;
+        }
+        try
+        {
+            comanda = await Api.RemoverItemAsync(comanda.Numero, itemId);
+        }
+        catch (Exception ex)
+        {
+            mensagem = $"Erro ao remover: {ex.Message}";
+        }
+    }
+
+    private async Task FecharAsync(FormaPagamento forma)
+    {
+        if (comanda is null)
+        {
+            return;
+        }
+        try
+        {
+            comanda = await Api.FecharComandaAsync(comanda.Numero, forma);
+            mensagem = $"Comanda fechada — {FormatarFormaPagamento(forma)} — Total: {comanda?.ValorTotal.ToString("C2", CulturaBR)}";
+        }
+        catch (Exception ex)
+        {
+            mensagem = $"Erro ao fechar: {ex.Message}";
+        }
+    }
+
+    private async Task CancelarAsync()
+    {
+        if (comanda is null)
+        {
+            return;
+        }
+        try
+        {
+            comanda = await Api.CancelarComandaAsync(comanda.Numero);
+            mensagem = "Comanda cancelada.";
+        }
+        catch (Exception ex)
+        {
+            mensagem = $"Erro ao cancelar: {ex.Message}";
+        }
+    }
+
+    private static string FormatarFormaPagamento(FormaPagamento fp) => fp switch
+    {
+        FormaPagamento.Dinheiro => "Dinheiro",
+        FormaPagamento.Debito => "Débito",
+        FormaPagamento.Credito => "Crédito",
+        FormaPagamento.Pix => "Pix",
+        FormaPagamento.ValeRefeicao => "Vale Refeição",
+        FormaPagamento.ValeAlimentacao => "Vale Alimentação",
+        _ => fp.ToString()
+    };
+
+    public void Dispose()
+    {
+        Pin.Mudou -= OnPinChanged;
+    }
+}
