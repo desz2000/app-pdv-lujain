@@ -16,6 +16,9 @@ public class ItemComanda
     [StringLength(200)]
     public string Descricao { get; set; } = string.Empty;
 
+    public int Quantidade { get; set; } = 1;
+
+    // Valor total da linha (ja inclui Quantidade — ex.: 3 cocas a R$ 5 cada => Valor=15).
     public decimal Valor { get; set; }
 
     public DateTime AdicionadoEm { get; set; } = DateTime.UtcNow;

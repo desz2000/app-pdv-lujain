@@ -48,6 +48,7 @@ else
                             <thead>
                                 <tr>
                                     <th>Descrição</th>
+                                    <th class="right">Qtde</th>
                                     <th>Origem</th>
                                     <th class="right">Valor</th>
                                     <th></th>
@@ -57,7 +58,14 @@ else
                                 @foreach (var item in comanda.Itens)
                                 {
                                     <tr>
-                                        <td>@item.Descricao</td>
+                                        <td>
+                                            @item.Descricao
+                                            @if (item.Quantidade > 1)
+                                            {
+                                                <span class="unit-hint"> — @((item.Valor / item.Quantidade).ToString("C2", CulturaBR)) cada</span>
+                                            }
+                                        </td>
+                                        <td class="right">@item.Quantidade</td>
                                         <td>@item.Origem</td>
                                         <td class="right">@item.Valor.ToString("C2", CulturaBR)</td>
                                         <td>
@@ -71,7 +79,7 @@ else
                             </tbody>
                             <tfoot>
                                 <tr>
-                                    <td colspan="2"><strong>Total</strong></td>
+                                    <td colspan="3"><strong>Total</strong></td>
                                     <td class="right total">@comanda.ValorTotal.ToString("C2", CulturaBR)</td>
                                     <td></td>
                                 </tr>
@@ -89,20 +97,44 @@ else
                                 <option value="0">— produto avulso —</option>
                                 @foreach (var p in produtos)
                                 {
-                                    <option value="@p.Id">@p.Nome (@p.Preco.ToString("C2", CulturaBR))</option>
+                                    <option value="@p.Id">
+                                        @p.Nome (@p.Preco.ToString("C2", CulturaBR)) — @(p.Tipo == TipoProduto.PrecoFixo ? "preço fixo" : "por kilo")
+                                    </option>
                                 }
                             </select>
-                            <input type="text"
-                                   placeholder="Descrição (se avulso)"
-                                   @bind="descricaoAvulsa" />
+                            @if (!ProdutoSelecionadoEhPrecoFixo)
+                            {
+                                <input type="text"
+                                       placeholder="Descrição (se avulso)"
+                                       @bind="descricaoAvulsa" />
+                                <input type="number"
+                                       step="0.01"
+                                       min="0"
+                                       placeholder="Valor"
+                                       @bind="valorItem"
+                                       @bind:event="oninput" />
+                            }
+                            else
+                            {
+                                <span class="preco-fixo-info">
+                                    @ProdutoSelecionado!.Preco.ToString("C2", CulturaBR) cada
+                                </span>
+                            }
                             <input type="number"
-                                   step="0.01"
-                                   min="0"
-                                   placeholder="Valor"
-                                   @bind="valorItem"
+                                   step="1"
+                                   min="1"
+                                   max="1000"
+                                   placeholder="Qtde"
+                                   class="qtde-input"
+                                   title="Quantidade"
+                                   @bind="quantidadeItem"
                                    @bind:event="oninput" />
                             <button class="secondary" @onclick="AdicionarItemAsync">Adicionar</button>
                         </div>
+                        @if (ProdutoSelecionadoEhPrecoFixo)
+                        {
+                            <p class="hint">Preço fixo: só informe a quantidade, o sistema calcula o total automaticamente.</p>
+                        }
                     </div>
 
                     <div class="fechar">
@@ -163,7 +195,15 @@ else
     private int produtoSelecionadoId;
     private string descricaoAvulsa = string.Empty;
     private decimal valorItem;
+    private int quantidadeItem = 1;
     private string? mensagem;
+
+    private ProdutoDto? ProdutoSelecionado => produtoSelecionadoId > 0
+        ? produtos.FirstOrDefault(p => p.Id == produtoSelecionadoId)
+        : null;
+
+    private bool ProdutoSelecionadoEhPrecoFixo =>
+        ProdutoSelecionado?.Tipo == TipoProduto.PrecoFixo;
 
     protected override async Task OnInitializedAsync()
     {
@@ -232,7 +272,13 @@ else
         {
             return;
         }
-        if (valorItem <= 0)
+        if (quantidadeItem < 1)
+        {
+            mensagem = "Quantidade deve ser pelo menos 1.";
+            return;
+        }
+        var ehPrecoFixo = ProdutoSelecionadoEhPrecoFixo;
+        if (!ehPrecoFixo && valorItem <= 0)
         {
             mensagem = "Valor deve ser maior que zero.";
             return;
@@ -243,12 +289,14 @@ else
             {
                 ProdutoId = produtoSelecionadoId > 0 ? produtoSelecionadoId : null,
                 Descricao = string.IsNullOrWhiteSpace(descricaoAvulsa) ? null : descricaoAvulsa,
-                Valor = valorItem,
+                Valor = ehPrecoFixo ? null : valorItem,
+                Quantidade = quantidadeItem,
                 Origem = OrigemItem.Caixa
             };
             comanda = await Api.AdicionarItemAsync(comanda.Numero, request);
             descricaoAvulsa = string.Empty;
             valorItem = 0;
+            quantidadeItem = 1;
             produtoSelecionadoId = 0;
             mensagem = null;
         }

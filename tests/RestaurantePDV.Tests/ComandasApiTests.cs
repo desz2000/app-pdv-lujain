@@ -217,6 +217,165 @@ public class ComandasApiTests
     }
 
     [Fact]
+    public async Task AdicionarItem_ProdutoPrecoFixo_CalculaValorPelaQuantidade()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        var produtoResp = await client.PostAsJsonAsync("/api/produtos", new CriarProdutoRequest
+        {
+            Nome = "Coca 350ml",
+            Preco = 5m,
+            Tipo = TipoProduto.PrecoFixo
+        });
+        var produto = await produtoResp.Content.ReadFromJsonAsync<ProdutoDto>();
+
+        // Operador so manda ProdutoId + Quantidade. Sem Valor.
+        var resp = await client.PostAsJsonAsync("/api/comandas/10/itens", new AdicionarItemRequest
+        {
+            ProdutoId = produto!.Id,
+            Quantidade = 3
+        });
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var comanda = await resp.Content.ReadFromJsonAsync<ComandaDto>();
+        var item = Assert.Single(comanda!.Itens);
+        Assert.Equal("Coca 350ml", item.Descricao);
+        Assert.Equal(3, item.Quantidade);
+        Assert.Equal(15m, item.Valor);
+        Assert.Equal(15m, comanda.ValorTotal);
+    }
+
+    [Fact]
+    public async Task AdicionarItem_ProdutoPrecoFixo_IgnoraValorDoRequest()
+    {
+        // Se o cliente mandar Valor pra um produto preco fixo, o servidor IGNORA
+        // (fonte da verdade e o preco do cadastro).
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        var produto = await (await client.PostAsJsonAsync("/api/produtos", new CriarProdutoRequest
+        {
+            Nome = "Agua",
+            Preco = 4m,
+            Tipo = TipoProduto.PrecoFixo
+        })).Content.ReadFromJsonAsync<ProdutoDto>();
+
+        var resp = await client.PostAsJsonAsync("/api/comandas/11/itens", new AdicionarItemRequest
+        {
+            ProdutoId = produto!.Id,
+            Valor = 9999m, // tentando burlar
+            Quantidade = 2
+        });
+        var comanda = await resp.Content.ReadFromJsonAsync<ComandaDto>();
+        Assert.Equal(8m, comanda!.ValorTotal);
+        Assert.Equal(2, comanda.Itens.Single().Quantidade);
+    }
+
+    [Fact]
+    public async Task AdicionarItem_ProdutoPorKilo_UsaValorManualMultiplicadoPelaQuantidade()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        var produto = await (await client.PostAsJsonAsync("/api/produtos", new CriarProdutoRequest
+        {
+            Nome = "Prato",
+            Preco = 0m,
+            Tipo = TipoProduto.PorKilo
+        })).Content.ReadFromJsonAsync<ProdutoDto>();
+
+        // Por kilo precisa do Valor manual (operador da balanca).
+        var resp = await client.PostAsJsonAsync("/api/comandas/12/itens", new AdicionarItemRequest
+        {
+            ProdutoId = produto!.Id,
+            Valor = 28.50m,
+            Quantidade = 1,
+            Origem = OrigemItem.Balanca
+        });
+        var comanda = await resp.Content.ReadFromJsonAsync<ComandaDto>();
+        Assert.Equal(28.50m, comanda!.ValorTotal);
+    }
+
+    [Fact]
+    public async Task AdicionarItem_ProdutoPorKilo_SemValor_Falha()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        var produto = await (await client.PostAsJsonAsync("/api/produtos", new CriarProdutoRequest
+        {
+            Nome = "Buffet",
+            Preco = 0m,
+            Tipo = TipoProduto.PorKilo
+        })).Content.ReadFromJsonAsync<ProdutoDto>();
+
+        var resp = await client.PostAsJsonAsync("/api/comandas/13/itens", new AdicionarItemRequest
+        {
+            ProdutoId = produto!.Id,
+            Quantidade = 1
+            // sem Valor
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task AdicionarItem_Avulso_PrecisaDeValor()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        // Item avulso sem produto cadastrado: valor obrigatorio.
+        var resp = await client.PostAsJsonAsync("/api/comandas/14/itens", new AdicionarItemRequest
+        {
+            Descricao = "Couvert",
+            Quantidade = 2
+            // sem Valor
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+
+        // Com valor: cria, multiplica pela quantidade.
+        resp = await client.PostAsJsonAsync("/api/comandas/14/itens", new AdicionarItemRequest
+        {
+            Descricao = "Couvert",
+            Valor = 5m,
+            Quantidade = 3
+        });
+        var comanda = await resp.Content.ReadFromJsonAsync<ComandaDto>();
+        Assert.Equal(15m, comanda!.ValorTotal);
+        Assert.Equal(3, comanda.Itens.Single().Quantidade);
+    }
+
+    [Fact]
+    public async Task Relatorio_TopProdutos_SomaQuantidadeNaoLinhas()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        var coca = await (await client.PostAsJsonAsync("/api/produtos", new CriarProdutoRequest
+        {
+            Nome = "Coca",
+            Preco = 5m,
+            Tipo = TipoProduto.PrecoFixo
+        })).Content.ReadFromJsonAsync<ProdutoDto>();
+
+        // Comanda 1: 1 linha de Coca x 3
+        await client.PostAsJsonAsync("/api/comandas/20/itens", new AdicionarItemRequest { ProdutoId = coca!.Id, Quantidade = 3 });
+        await client.PostAsJsonAsync("/api/comandas/20/fechar", new FecharComandaRequest { FormaPagamento = FormaPagamento.Dinheiro });
+
+        // Comanda 2: 2 linhas separadas de Coca x 1 e x 2
+        await client.PostAsJsonAsync("/api/comandas/21/itens", new AdicionarItemRequest { ProdutoId = coca.Id, Quantidade = 1 });
+        await client.PostAsJsonAsync("/api/comandas/21/itens", new AdicionarItemRequest { ProdutoId = coca.Id, Quantidade = 2 });
+        await client.PostAsJsonAsync("/api/comandas/21/fechar", new FecharComandaRequest { FormaPagamento = FormaPagamento.Pix });
+
+        var hoje = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
+        var relatorio = await client.GetFromJsonAsync<RelatorioDiarioDto>($"/api/relatorios/dia?data={hoje}");
+        var topCoca = relatorio!.TopProdutos.Single(t => t.Descricao == "Coca");
+        // 3 + 1 + 2 = 6 unidades vendidas, R$ 30 no total.
+        Assert.Equal(6, topCoca.Quantidade);
+        Assert.Equal(30m, topCoca.Total);
+    }
+
+    [Fact]
     public async Task ValidarPin_OkQuandoCorreto()
     {
         using var factory = NewFactory();

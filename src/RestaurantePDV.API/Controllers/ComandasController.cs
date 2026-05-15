@@ -65,6 +65,53 @@ public class ComandasController : ControllerBase
             return BadRequest("Número da comanda inválido.");
         }
 
+        if (request.Quantidade < 1)
+        {
+            return BadRequest("Quantidade deve ser maior ou igual a 1.");
+        }
+
+        Produto? produto = null;
+        if (request.ProdutoId.HasValue)
+        {
+            produto = await _db.Produtos.FindAsync(request.ProdutoId.Value);
+            if (produto is null)
+            {
+                return BadRequest($"Produto {request.ProdutoId} não encontrado.");
+            }
+        }
+
+        // Resolve descricao e valor total da linha conforme o tipo de item.
+        string descricao;
+        decimal valorTotalLinha;
+        if (produto is not null && produto.Tipo == TipoProduto.PrecoFixo)
+        {
+            // Preço fixo: usa o preço do cadastro multiplicado pela quantidade.
+            // Operador só informa a quantidade (default 1).
+            descricao = produto.Nome;
+            valorTotalLinha = produto.Preco * request.Quantidade;
+        }
+        else
+        {
+            // Produto por kilo (varia por peso) ou item avulso: precisa do valor manual.
+            if (request.Valor is null || request.Valor <= 0)
+            {
+                return BadRequest("Valor é obrigatório para item por kilo ou avulso.");
+            }
+            valorTotalLinha = request.Valor.Value * request.Quantidade;
+            if (produto is not null)
+            {
+                descricao = produto.Nome;
+            }
+            else if (!string.IsNullOrWhiteSpace(request.Descricao))
+            {
+                descricao = request.Descricao.Trim();
+            }
+            else
+            {
+                descricao = request.Origem == OrigemItem.Balanca ? "Prato (balança)" : "Item";
+            }
+        }
+
         // Procura a comanda *aberta* com esse numero. Se a anterior ja foi fechada/cancelada,
         // cria uma nova — o cartao fisico foi devolvido e reusado por um novo cliente.
         var comanda = await _db.Comandas
@@ -82,30 +129,12 @@ public class ComandasController : ControllerBase
             _db.Comandas.Add(comanda);
         }
 
-        string descricao;
-        if (request.ProdutoId.HasValue)
-        {
-            var produto = await _db.Produtos.FindAsync(request.ProdutoId.Value);
-            if (produto is null)
-            {
-                return BadRequest($"Produto {request.ProdutoId} não encontrado.");
-            }
-            descricao = produto.Nome;
-        }
-        else if (!string.IsNullOrWhiteSpace(request.Descricao))
-        {
-            descricao = request.Descricao.Trim();
-        }
-        else
-        {
-            descricao = request.Origem == OrigemItem.Balanca ? "Prato (balança)" : "Item";
-        }
-
         var item = new ItemComanda
         {
-            ProdutoId = request.ProdutoId,
+            ProdutoId = produto?.Id,
             Descricao = descricao,
-            Valor = request.Valor,
+            Quantidade = request.Quantidade,
+            Valor = valorTotalLinha,
             AdicionadoEm = DateTime.UtcNow,
             Origem = request.Origem
         };
@@ -226,6 +255,7 @@ public class ComandasController : ControllerBase
                 Id = i.Id,
                 ProdutoId = i.ProdutoId,
                 Descricao = i.Descricao,
+                Quantidade = i.Quantidade,
                 Valor = i.Valor,
                 AdicionadoEm = i.AdicionadoEm,
                 Origem = i.Origem
