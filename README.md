@@ -4,7 +4,7 @@ Sistema de Ponto de Venda (PDV) para restaurante por kilo. Composto por:
 
 - **API** ASP.NET Core 8.0 com SQLite (Entity Framework Core)
 - **Web** Blazor Server (caixa, cardápio, dashboard, fechar caixa)
-- **Mobile** .NET MAUI (operador da balança) — _em PR separado_
+- **Mobile** .NET MAUI (operador da balança) — repo [`desz2000/app-mobile-pdv-lujain`](https://github.com/desz2000/app-mobile-pdv-lujain)
 
 ## Estrutura
 
@@ -25,6 +25,18 @@ tests/
 - .NET SDK 8.0
 
 ## Como rodar
+
+### Windows (modo fácil)
+
+Duplo-clique em **`start.cmd`** na raiz do repositório. Ele:
+
+1. Abre uma janela rodando a API em http://localhost:5170
+2. Abre outra janela rodando o caixa em http://localhost:5180
+3. Abre o navegador apontando pra http://localhost:5180
+
+Pra desligar, feche as duas janelas (`PDV API` e `PDV Caixa`) ou rode **`stop.cmd`**.
+
+### Manual (qualquer SO)
 
 Em dois terminais separados, a partir da raiz do repositório:
 
@@ -96,4 +108,4 @@ Os testes de integração usam SQLite in-memory (mesma engine de produção) e c
 
 ## Roadmap
 
-- App MAUI da balança (PIN + nº comanda + valor + adicionar) — próximo PR
+- App MAUI da balança — feito no repo [`desz2000/app-mobile-pdv-lujain`](https://github.com/desz2000/app-mobile-pdv-lujain)
