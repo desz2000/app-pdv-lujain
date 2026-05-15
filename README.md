@@ -30,19 +30,21 @@ tests/
 
 Duplo-clique em **`start.cmd`** na raiz do repositório. Ele:
 
-1. Abre uma janela rodando a API em http://localhost:5170
+1. Abre uma janela rodando a API em `http://0.0.0.0:5170` (aceita conexões da rede)
 2. Abre outra janela rodando o caixa em http://localhost:5180
 3. Abre o navegador apontando pra http://localhost:5180
 
 Pra desligar, feche as duas janelas (`PDV API` e `PDV Caixa`) ou rode **`stop.cmd`**.
+
+> Na primeira execução, o Windows vai perguntar se quer liberar `dotnet` no Firewall — autorize a caixa **"Redes privadas"** pra que o celular da balança consiga conectar.
 
 ### Manual (qualquer SO)
 
 Em dois terminais separados, a partir da raiz do repositório:
 
 ```bash
-# Terminal 1 — API
-dotnet run --project src/RestaurantePDV.API --urls http://localhost:5170
+# Terminal 1 — API (escuta em todas as interfaces pra aceitar o celular da balança)
+dotnet run --project src/RestaurantePDV.API --urls http://0.0.0.0:5170
 
 # Terminal 2 — Front web
 dotnet run --project src/RestaurantePDV.Desktop --urls http://localhost:5180
@@ -51,6 +53,24 @@ dotnet run --project src/RestaurantePDV.Desktop --urls http://localhost:5180
 Depois abra http://localhost:5180 no navegador. O PIN padrão é `1234` (configurável em `appsettings.json`).
 
 A API cria o banco SQLite (`pdv-lujain.db`) automaticamente na primeira execução.
+
+### Conectando o celular da balança
+
+A API precisa estar bindada em `0.0.0.0` (o `start.cmd` já faz isso). No app PDV Balança, em **Configurações** → URL da API, use a URL que cabe ao seu cenário:
+
+| Cenário | URL no app |
+| ------- | ---------- |
+| **Celular real** na mesma Wi-Fi do PC do caixa | `http://<IP-DO-PC>:5170` — descubra o IP com `ipconfig` no Windows (linha "IPv4 Address" da interface Wi-Fi) |
+| **Emulador Android** rodando no mesmo PC | `http://10.0.2.2:5170` — `10.0.2.2` é um alias mágico do emulador que aponta pro localhost do host |
+| **Genymotion / outro emulador** | depende do emulador; geralmente o IP da LAN do host funciona, ou um alias específico |
+
+> O IP `127.0.0.1` / `localhost` **não funciona** dentro do emulador nem do celular, porque pra eles "localhost" é o próprio dispositivo, não o PC.
+
+> Se o celular ainda não conectar mesmo com `0.0.0.0` e o IP certo, o problema é Firewall do Windows. Vá em "Windows Defender Firewall" → "Permitir um aplicativo" → procure `dotnet` e marque a coluna **Privada**. Ou, mais rápido, libere a porta com este comando em PowerShell como administrador:
+>
+> ```powershell
+> New-NetFirewallRule -DisplayName "PDV API 5170" -Direction Inbound -LocalPort 5170 -Protocol TCP -Action Allow -Profile Private
+> ```
 
 ## Configuração
 
