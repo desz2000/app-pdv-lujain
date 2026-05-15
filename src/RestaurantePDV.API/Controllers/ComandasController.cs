@@ -20,10 +20,24 @@ public class ComandasController : ControllerBase
     [HttpGet("{numero:int}")]
     public async Task<ActionResult<ComandaDto>> Obter(int numero)
     {
+        // Prefere a comanda aberta; se nao houver, devolve a mais recente (pra mostrar fechada
+        // com botão "Reabrir" no caixa).
         var comanda = await _db.Comandas
             .AsNoTracking()
             .Include(c => c.Itens)
-            .FirstOrDefaultAsync(c => c.Numero == numero);
+            .Where(c => c.Numero == numero && c.Status == StatusComanda.Aberta)
+            .FirstOrDefaultAsync();
+
+        if (comanda is null)
+        {
+            comanda = await _db.Comandas
+                .AsNoTracking()
+                .Include(c => c.Itens)
+                .Where(c => c.Numero == numero)
+                .OrderByDescending(c => c.AbertaEm)
+                .FirstOrDefaultAsync();
+        }
+
         if (comanda is null)
         {
             return NotFound();
@@ -51,9 +65,11 @@ public class ComandasController : ControllerBase
             return BadRequest("Número da comanda inválido.");
         }
 
+        // Procura a comanda *aberta* com esse numero. Se a anterior ja foi fechada/cancelada,
+        // cria uma nova — o cartao fisico foi devolvido e reusado por um novo cliente.
         var comanda = await _db.Comandas
             .Include(c => c.Itens)
-            .FirstOrDefaultAsync(c => c.Numero == numero);
+            .FirstOrDefaultAsync(c => c.Numero == numero && c.Status == StatusComanda.Aberta);
 
         if (comanda is null)
         {
@@ -64,11 +80,6 @@ public class ComandasController : ControllerBase
                 AbertaEm = DateTime.UtcNow
             };
             _db.Comandas.Add(comanda);
-        }
-
-        if (comanda.Status != StatusComanda.Aberta)
-        {
-            return BadRequest($"Comanda {numero} já está {comanda.Status.ToString().ToLowerInvariant()}.");
         }
 
         string descricao;
@@ -110,14 +121,10 @@ public class ComandasController : ControllerBase
     {
         var comanda = await _db.Comandas
             .Include(c => c.Itens)
-            .FirstOrDefaultAsync(c => c.Numero == numero);
+            .FirstOrDefaultAsync(c => c.Numero == numero && c.Status == StatusComanda.Aberta);
         if (comanda is null)
         {
             return NotFound();
-        }
-        if (comanda.Status != StatusComanda.Aberta)
-        {
-            return BadRequest($"Comanda {numero} já está {comanda.Status.ToString().ToLowerInvariant()}.");
         }
         var item = comanda.Itens.FirstOrDefault(i => i.Id == itemId);
         if (item is null)
@@ -136,14 +143,10 @@ public class ComandasController : ControllerBase
     {
         var comanda = await _db.Comandas
             .Include(c => c.Itens)
-            .FirstOrDefaultAsync(c => c.Numero == numero);
+            .FirstOrDefaultAsync(c => c.Numero == numero && c.Status == StatusComanda.Aberta);
         if (comanda is null)
         {
             return NotFound();
-        }
-        if (comanda.Status != StatusComanda.Aberta)
-        {
-            return BadRequest($"Comanda {numero} já está {comanda.Status.ToString().ToLowerInvariant()}.");
         }
         if (comanda.Itens.Count == 0)
         {
@@ -163,17 +166,46 @@ public class ComandasController : ControllerBase
     {
         var comanda = await _db.Comandas
             .Include(c => c.Itens)
-            .FirstOrDefaultAsync(c => c.Numero == numero);
+            .FirstOrDefaultAsync(c => c.Numero == numero && c.Status == StatusComanda.Aberta);
         if (comanda is null)
         {
             return NotFound();
         }
-        if (comanda.Status == StatusComanda.Fechada)
-        {
-            return BadRequest("Comanda já fechada não pode ser cancelada.");
-        }
         comanda.Status = StatusComanda.Cancelada;
         comanda.FechadaEm = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return Ok(ToDto(comanda));
+    }
+
+    [HttpPost("{numero:int}/reabrir")]
+    public async Task<ActionResult<ComandaDto>> Reabrir(int numero)
+    {
+        // Se ja existe uma aberta com esse numero, nao deixa reabrir outra do historico
+        // (senao o cartao fisico teria duas comandas "vivas" simultaneamente).
+        var jaAberta = await _db.Comandas
+            .AsNoTracking()
+            .AnyAsync(c => c.Numero == numero && c.Status == StatusComanda.Aberta);
+        if (jaAberta)
+        {
+            return BadRequest($"Já existe uma comanda {numero} aberta. Feche-a antes de reabrir uma anterior.");
+        }
+
+        // Pega a mais recentemente fechada/cancelada com esse numero.
+        var comanda = await _db.Comandas
+            .Include(c => c.Itens)
+            .Where(c => c.Numero == numero && c.Status != StatusComanda.Aberta)
+            .OrderByDescending(c => c.FechadaEm)
+            .ThenByDescending(c => c.AbertaEm)
+            .FirstOrDefaultAsync();
+        if (comanda is null)
+        {
+            return NotFound();
+        }
+
+        comanda.Status = StatusComanda.Aberta;
+        comanda.FechadaEm = null;
+        comanda.FormaPagamento = null;
+        comanda.ValorTotal = comanda.Itens.Sum(i => i.Valor);
         await _db.SaveChangesAsync();
         return Ok(ToDto(comanda));
     }

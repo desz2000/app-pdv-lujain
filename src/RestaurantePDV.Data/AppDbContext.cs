@@ -27,7 +27,12 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Comanda>(e =>
         {
             e.HasKey(c => c.Id);
-            e.HasIndex(c => c.Numero).IsUnique();
+            // Numero so e unico entre comandas abertas (status=0). Comandas fechadas/canceladas
+            // mantem o numero pra historico, e o mesmo cartao fisico pode ser reusado em novas visitas.
+            e.HasIndex(c => c.Numero)
+                .IsUnique()
+                .HasFilter("\"Status\" = 0")
+                .HasDatabaseName("IX_Comandas_Numero_Aberta");
             e.Property(c => c.ValorTotal).HasColumnType("decimal(10,2)");
             e.HasMany(c => c.Itens)
                 .WithOne(i => i.Comanda)

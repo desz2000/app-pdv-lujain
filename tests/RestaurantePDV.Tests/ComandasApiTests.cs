@@ -55,12 +55,102 @@ public class ComandasApiTests
         Assert.Equal(FormaPagamento.Pix, comanda.FormaPagamento);
         Assert.NotNull(comanda.FechadaEm);
 
+        // Comanda fechada e o cartao foi devolvido: novo cliente usa o mesmo numero,
+        // operador da balanca lanca de novo -> sistema cria uma comanda nova com o mesmo numero.
         resp = await client.PostAsJsonAsync($"/api/comandas/{numero}/itens", new AdicionarItemRequest
         {
-            Descricao = "Outro",
-            Valor = 1m
+            Descricao = "Novo cliente",
+            Valor = 1m,
+            Origem = OrigemItem.Balanca
         });
-        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var novaComanda = await resp.Content.ReadFromJsonAsync<ComandaDto>();
+        Assert.NotNull(novaComanda);
+        Assert.Equal(StatusComanda.Aberta, novaComanda!.Status);
+        Assert.Equal(numero, novaComanda.Numero);
+        Assert.NotEqual(comanda.Id, novaComanda.Id);
+        Assert.Single(novaComanda.Itens);
+        Assert.Equal(1m, novaComanda.ValorTotal);
+    }
+
+    [Fact]
+    public async Task ReusoDeNumero_AposFechar_CriaComandaNova()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+        var numero = 5;
+
+        await client.PostAsJsonAsync($"/api/comandas/{numero}/itens", new AdicionarItemRequest { Descricao = "Almoco", Valor = 30m });
+        var fecharResp = await client.PostAsJsonAsync($"/api/comandas/{numero}/fechar", new FecharComandaRequest { FormaPagamento = FormaPagamento.Dinheiro });
+        var fechada = await fecharResp.Content.ReadFromJsonAsync<ComandaDto>();
+        Assert.Equal(StatusComanda.Fechada, fechada!.Status);
+
+        // Cliente novo usa o mesmo cartao #5.
+        var novaResp = await client.PostAsJsonAsync($"/api/comandas/{numero}/itens", new AdicionarItemRequest { Descricao = "Jantar", Valor = 45m });
+        Assert.Equal(HttpStatusCode.OK, novaResp.StatusCode);
+        var nova = await novaResp.Content.ReadFromJsonAsync<ComandaDto>();
+        Assert.NotEqual(fechada.Id, nova!.Id);
+        Assert.Equal(StatusComanda.Aberta, nova.Status);
+        Assert.Equal(45m, nova.ValorTotal);
+
+        // GET retorna a aberta, nao a fechada.
+        var getResp = await client.GetAsync($"/api/comandas/{numero}");
+        var get = await getResp.Content.ReadFromJsonAsync<ComandaDto>();
+        Assert.Equal(nova.Id, get!.Id);
+        Assert.Equal(StatusComanda.Aberta, get.Status);
+    }
+
+    [Fact]
+    public async Task Reabrir_ComandaFechada_VoltaParaAberta_ComItens()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+        var numero = 7;
+
+        await client.PostAsJsonAsync($"/api/comandas/{numero}/itens", new AdicionarItemRequest { Descricao = "Prato", Valor = 25m, Origem = OrigemItem.Balanca });
+        await client.PostAsJsonAsync($"/api/comandas/{numero}/itens", new AdicionarItemRequest { Descricao = "Refri", Valor = 6m });
+        var fecharResp = await client.PostAsJsonAsync($"/api/comandas/{numero}/fechar", new FecharComandaRequest { FormaPagamento = FormaPagamento.Pix });
+        var fechada = await fecharResp.Content.ReadFromJsonAsync<ComandaDto>();
+        Assert.Equal(StatusComanda.Fechada, fechada!.Status);
+        Assert.Equal(31m, fechada.ValorTotal);
+
+        var reabrirResp = await client.PostAsync($"/api/comandas/{numero}/reabrir", content: null);
+        Assert.Equal(HttpStatusCode.OK, reabrirResp.StatusCode);
+        var reaberta = await reabrirResp.Content.ReadFromJsonAsync<ComandaDto>();
+        Assert.Equal(fechada.Id, reaberta!.Id);
+        Assert.Equal(StatusComanda.Aberta, reaberta.Status);
+        Assert.Null(reaberta.FormaPagamento);
+        Assert.Null(reaberta.FechadaEm);
+        Assert.Equal(2, reaberta.Itens.Count);
+        Assert.Equal(31m, reaberta.ValorTotal);
+    }
+
+    [Fact]
+    public async Task Reabrir_ComandaInexistente_RetornaNotFound()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+        var resp = await client.PostAsync("/api/comandas/77777/reabrir", content: null);
+        Assert.Equal(HttpStatusCode.NotFound, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reabrir_ComOutraComandaAbertaNoMesmoNumero_Falha()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+        var numero = 9;
+
+        // Fecha a primeira comanda 9.
+        await client.PostAsJsonAsync($"/api/comandas/{numero}/itens", new AdicionarItemRequest { Descricao = "v1", Valor = 10m });
+        await client.PostAsJsonAsync($"/api/comandas/{numero}/fechar", new FecharComandaRequest { FormaPagamento = FormaPagamento.Dinheiro });
+
+        // Cria uma nova com o mesmo numero (novo cliente).
+        await client.PostAsJsonAsync($"/api/comandas/{numero}/itens", new AdicionarItemRequest { Descricao = "v2", Valor = 15m });
+
+        // Tentar reabrir a antiga agora tem que falhar (ja existe uma aberta).
+        var reabrirResp = await client.PostAsync($"/api/comandas/{numero}/reabrir", content: null);
+        Assert.Equal(HttpStatusCode.BadRequest, reabrirResp.StatusCode);
     }
 
     [Fact]

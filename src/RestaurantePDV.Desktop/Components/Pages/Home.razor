@@ -130,6 +130,14 @@ else
                         {
                             <p>Em: @comanda.FechadaEm.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
                         }
+                        <div class="acoes-encerrada">
+                            <button class="secondary" @onclick="ReabrirAsync">Reabrir esta comanda</button>
+                            <button class="primary" @onclick="IniciarNovaComanda">Iniciar nova comanda #@comanda.Numero</button>
+                        </div>
+                        <p class="hint">
+                            “Reabrir” serve pra desfazer um fechamento errado (volta com os itens).
+                            “Iniciar nova” é pra quando o cartão foi devolvido e um novo cliente vai usá-lo.
+                        </p>
                     </div>
                 }
             </section>
@@ -281,6 +289,34 @@ else
         {
             mensagem = $"Erro ao fechar: {ex.Message}";
         }
+    }
+
+    private async Task ReabrirAsync()
+    {
+        if (comanda is null)
+        {
+            return;
+        }
+        try
+        {
+            comanda = await Api.ReabrirComandaAsync(comanda.Numero);
+            mensagem = $"Comanda {comanda?.Numero} reaberta.";
+        }
+        catch (Exception ex)
+        {
+            mensagem = $"Erro ao reabrir: {ex.Message}";
+        }
+    }
+
+    private void IniciarNovaComanda()
+    {
+        if (comanda is null)
+        {
+            return;
+        }
+        var numero = comanda.Numero;
+        comanda = new ComandaDto { Numero = numero, Status = StatusComanda.Aberta };
+        mensagem = $"Pronto pra começar uma comanda nova com o número {numero}. Adicione o primeiro item.";
     }
 
     private async Task CancelarAsync()
