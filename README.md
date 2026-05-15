@@ -84,6 +84,7 @@ A API cria o banco SQLite (`pdv-lujain.db`) automaticamente na primeira execuç�
 | DELETE | `/api/comandas/{numero}/itens/{itemId}` | Remove item |
 | POST | `/api/comandas/{numero}/fechar` | Fecha com forma de pagamento |
 | POST | `/api/comandas/{numero}/cancelar` | Cancela comanda |
+| POST | `/api/comandas/{numero}/reabrir` | Desfaz o fechamento da comanda mais recente com esse número (se não houver outra aberta no mesmo número) |
 | GET | `/api/relatorios/dia?data=YYYY-MM-DD` | Relatório do dia em JSON |
 | GET | `/api/relatorios/dia/excel?data=YYYY-MM-DD` | Excel com 4 abas (Resumo, Forma de Pagamento, Por Hora, Top Produtos) |
 
@@ -105,6 +106,14 @@ Os testes de integração usam SQLite in-memory (mesma engine de produção) e c
 - Pix
 - Vale Refeição
 - Vale Alimentação
+
+## Reuso de comandas e reabertura
+
+O número da comanda representa um **cartão físico** que circula pelo salão e pode ser reusado várias vezes ao dia:
+
+- O número só é único entre as comandas **abertas**. Comandas fechadas/canceladas ficam no histórico com o mesmo número.
+- Quando o operador da balança lança um item na comanda #5 e não existe nenhuma #5 aberta, o sistema **cria uma comanda nova** automaticamente (mesmo que existam #5 antigas já fechadas). Cada visita de cliente é uma comanda separada nos relatórios.
+- Se o caixa fechou uma comanda por engano, ele pode buscar o número e clicar em **"Reabrir esta comanda"** — o sistema volta o status pra Aberta, mantém os itens e zera a forma de pagamento. A API rejeita reabrir se já existir uma comanda aberta com o mesmo número (pra não criar dois "ativos" pro mesmo cartão).
 
 ## Roadmap
 

@@ -47,6 +47,10 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
+    // Migracao leve pra DB existente que ainda tem o indice unico global em Numero.
+    // Substitui pelo indice unico filtrado (status=0 = Aberta), pra permitir reuso de numero.
+    db.Database.ExecuteSqlRaw("DROP INDEX IF EXISTS \"IX_Comandas_Numero\";");
+    db.Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_Comandas_Numero_Aberta\" ON \"Comandas\" (\"Numero\") WHERE \"Status\" = 0;");
 }
 
 if (app.Environment.IsDevelopment())

@@ -183,6 +183,9 @@ tr.inativo { opacity: 0.6; }
 .forma:hover { background: #e5e7eb; }
 
 .encerrada { background: #f9fafb; padding: 1rem; border-radius: 6px; }
+.acoes-encerrada { display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
+.acoes-encerrada button { padding: 0.65rem 1rem; }
+.hint { font-size: 0.85rem; color: #6b7280; margin-top: 0.5rem; }
 
 .form-card { background: #fff; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; }
 .form-card h3 { margin-top: 0; }

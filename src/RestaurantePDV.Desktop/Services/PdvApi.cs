@@ -19,6 +19,7 @@ public interface IPdvApi
     Task<ComandaDto?> RemoverItemAsync(int numero, int itemId, CancellationToken ct = default);
     Task<ComandaDto?> FecharComandaAsync(int numero, FormaPagamento forma, CancellationToken ct = default);
     Task<ComandaDto?> CancelarComandaAsync(int numero, CancellationToken ct = default);
+    Task<ComandaDto?> ReabrirComandaAsync(int numero, CancellationToken ct = default);
 
     Task<RelatorioDiarioDto?> ObterRelatorioDiarioAsync(DateTime data, CancellationToken ct = default);
     Task<byte[]?> BaixarRelatorioExcelAsync(DateTime data, CancellationToken ct = default);
@@ -126,6 +127,14 @@ public class PdvApi : IPdvApi
     {
         AplicarPin();
         var response = await _http.PostAsync($"/api/comandas/{numero}/cancelar", content: null, ct);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<ComandaDto>(cancellationToken: ct);
+    }
+
+    public async Task<ComandaDto?> ReabrirComandaAsync(int numero, CancellationToken ct = default)
+    {
+        AplicarPin();
+        var response = await _http.PostAsync($"/api/comandas/{numero}/reabrir", content: null, ct);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<ComandaDto>(cancellationToken: ct);
     }
