@@ -1,0 +1,228 @@
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f4f5f7;
+    color: #222;
+}
+
+h1 { margin: 0 0 1rem; }
+
+.layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 220px;
+    background: #1f2937;
+    color: #fff;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sidebar .brand {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #fbbf24;
+}
+
+.sidebar .nav-link {
+    color: #e5e7eb;
+    text-decoration: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+}
+
+.sidebar .nav-link:hover { background: #374151; }
+.sidebar .nav-link.active { background: #2563eb; color: #fff; }
+
+.sidebar .logout {
+    margin-top: auto;
+    background: transparent;
+    border: 1px solid #6b7280;
+    color: #e5e7eb;
+    padding: 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.content {
+    flex: 1;
+    padding: 1.5rem 2rem;
+    overflow: auto;
+}
+
+button {
+    cursor: pointer;
+    border: none;
+    border-radius: 6px;
+    padding: 0.55rem 1rem;
+    font-weight: 600;
+}
+
+button.primary { background: #2563eb; color: #fff; }
+button.primary:hover { background: #1d4ed8; }
+button.primary:disabled { background: #9ca3af; cursor: not-allowed; }
+
+button.secondary { background: #e5e7eb; color: #111; }
+button.secondary:hover { background: #d1d5db; }
+
+button.link {
+    background: transparent;
+    color: #2563eb;
+    text-decoration: underline;
+    padding: 0;
+    font-weight: normal;
+}
+
+button.cancelar {
+    background: transparent;
+    color: #b91c1c;
+    border: 1px solid #b91c1c;
+    margin-top: 0.5rem;
+}
+
+input, select {
+    padding: 0.55rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 1rem;
+    background: #fff;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+table th, table td {
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+table th { background: #f3f4f6; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; }
+table tfoot td { font-weight: 700; }
+table .right { text-align: right; }
+.vazio { color: #6b7280; font-style: italic; padding: 1rem; }
+tr.inativo { opacity: 0.6; }
+
+.login-card {
+    max-width: 360px;
+    margin: 4rem auto;
+    background: #fff;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.login-card .pin-input { font-size: 1.5rem; text-align: center; letter-spacing: 0.4em; }
+.erro { color: #b91c1c; font-size: 0.9rem; }
+.mensagem { padding: 0.5rem 0.75rem; background: #fef3c7; color: #92400e; border-radius: 6px; margin-top: 0.5rem; }
+
+.caixa-grid { display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; }
+@media (max-width: 900px) { .caixa-grid { grid-template-columns: 1fr; } }
+
+.busca {
+    background: #fff;
+    padding: 1rem;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    height: fit-content;
+}
+
+.num-input {
+    font-size: 2rem;
+    text-align: center;
+}
+
+.comanda {
+    background: #fff;
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+}
+
+.comanda header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.comanda h2 { margin: 0; }
+.comanda .status { padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
+.comanda .status.aberta { background: #dbeafe; color: #1e40af; }
+.comanda .status.fechada { background: #dcfce7; color: #166534; }
+.comanda .status.cancelada { background: #fee2e2; color: #991b1b; }
+
+.comanda .total { font-size: 1.1rem; color: #166534; }
+
+.adicionar, .fechar { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
+.adicionar h3, .fechar h3 { margin: 0 0 0.75rem; }
+
+.form-row { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.form-row input, .form-row select { min-width: 100px; flex: 1; }
+.form-row .ativo { display: flex; gap: 0.25rem; align-items: center; }
+
+.formas { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; }
+.forma { background: #f3f4f6; color: #111; padding: 0.8rem; border-radius: 6px; font-weight: 600; }
+.forma:hover { background: #e5e7eb; }
+
+.encerrada { background: #f9fafb; padding: 1rem; border-radius: 6px; }
+
+.form-card { background: #fff; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; }
+.form-card h3 { margin-top: 0; }
+
+.filtros { margin: 0.5rem 0; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.card { background: #fff; padding: 1rem 1.25rem; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.card .label { font-size: 0.85rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+.card .valor { font-size: 1.7rem; font-weight: 700; color: #111; margin-top: 0.25rem; }
+
+.grafico-card { background: #fff; padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; }
+.grafico-card h3 { margin-top: 0; }
+
+.bar-col { width: 35%; }
+.bar { height: 12px; background: #2563eb; border-radius: 6px; }
+
+.bars-horizontal { display: flex; gap: 4px; align-items: flex-end; height: 180px; padding: 1rem 0; }
+.bar-h { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; }
+.bar-h .bar-fill { width: 100%; max-width: 32px; background: #2563eb; border-radius: 4px 4px 0 0; transition: height 0.2s; min-height: 2px; }
+.bar-h .bar-label { font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem; }
+
+.filtros-data { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; }
+
+#blazor-error-ui {
+    background: #fef3c7;
+    color: #92400e;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0,0,0,0.1);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}

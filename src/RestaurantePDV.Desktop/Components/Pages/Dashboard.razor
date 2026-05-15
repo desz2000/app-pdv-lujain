@@ -1,0 +1,195 @@
+@page "/dashboard"
+@inject IPdvApi Api
+@inject PinState Pin
+@implements IDisposable
+
+<PageTitle>Dashboard — PDV Lujain</PageTitle>
+
+@if (!Pin.Autenticado)
+{
+    <LoginPin />
+}
+else
+{
+    <h1>Dashboard</h1>
+
+    <div class="filtros-data">
+        <label>Data:</label>
+        <input type="date" @bind="data" @bind:after="CarregarAsync" />
+        <button class="secondary" @onclick="CarregarAsync">Atualizar</button>
+    </div>
+
+    @if (relatorio is null)
+    {
+        <p>Carregando...</p>
+    }
+    else
+    {
+        <div class="cards">
+            <div class="card">
+                <div class="label">Comandas</div>
+                <div class="valor">@relatorio.TotalComandas</div>
+            </div>
+            <div class="card">
+                <div class="label">Faturamento</div>
+                <div class="valor">@relatorio.Faturamento.ToString("C2", CulturaBR)</div>
+            </div>
+            <div class="card">
+                <div class="label">Ticket médio</div>
+                <div class="valor">@relatorio.TicketMedio.ToString("C2", CulturaBR)</div>
+            </div>
+        </div>
+
+        <section class="grafico-card">
+            <h3>Faturamento por forma de pagamento</h3>
+            @if (relatorio.PorFormaPagamento.Count == 0)
+            {
+                <div class="vazio">Sem dados para o dia.</div>
+            }
+            else
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Forma</th>
+                            <th class="right">Qtd</th>
+                            <th class="right">Total</th>
+                            <th class="bar-col">Distribuição</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            var maxTotal = relatorio.PorFormaPagamento.Max(x => x.Total);
+                        }
+                        @foreach (var fp in relatorio.PorFormaPagamento)
+                        {
+                            var pct = maxTotal == 0 ? 0 : (int)((fp.Total / maxTotal) * 100);
+                            <tr>
+                                <td>@FormatarFormaPagamento(fp.FormaPagamento)</td>
+                                <td class="right">@fp.Quantidade</td>
+                                <td class="right">@fp.Total.ToString("C2", CulturaBR)</td>
+                                <td class="bar-col">
+                                    <div class="bar" style="width: @(pct)%"></div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+
+        <section class="grafico-card">
+            <h3>Faturamento por hora</h3>
+            @if (relatorio.PorHora.Count == 0)
+            {
+                <div class="vazio">Sem dados para o dia.</div>
+            }
+            else
+            {
+                <div class="bars-horizontal">
+                    @{
+                        var max = relatorio.PorHora.Max(x => x.Total);
+                    }
+                    @foreach (var h in relatorio.PorHora)
+                    {
+                        var altura = max == 0 ? 0 : (int)((h.Total / max) * 100);
+                        <div class="bar-h">
+                            <div class="bar-fill" style="height: @(altura)%" title="@h.Total.ToString("C2", CulturaBR)"></div>
+                            <div class="bar-label">@($"{h.Hora:00}h")</div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="grafico-card">
+            <h3>Top produtos</h3>
+            @if (relatorio.TopProdutos.Count == 0)
+            {
+                <div class="vazio">Sem dados.</div>
+            }
+            else
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Produto</th>
+                            <th class="right">Qtd</th>
+                            <th class="right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var p in relatorio.TopProdutos)
+                        {
+                            <tr>
+                                <td>@p.Descricao</td>
+                                <td class="right">@p.Quantidade</td>
+                                <td class="right">@p.Total.ToString("C2", CulturaBR)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </section>
+    }
+
+    @if (!string.IsNullOrEmpty(mensagem))
+    {
+        <div class="mensagem">@mensagem</div>
+    }
+}
+
+@code {
+    private static readonly System.Globalization.CultureInfo CulturaBR = new("pt-BR");
+
+    private DateTime data = DateTime.Today;
+    private RelatorioDiarioDto? relatorio;
+    private string? mensagem;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Pin.Mudou += OnPinChanged;
+        if (Pin.Autenticado)
+        {
+            await CarregarAsync();
+        }
+    }
+
+    private async void OnPinChanged()
+    {
+        if (Pin.Autenticado)
+        {
+            await CarregarAsync();
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CarregarAsync()
+    {
+        mensagem = null;
+        try
+        {
+            relatorio = await Api.ObterRelatorioDiarioAsync(data);
+        }
+        catch (Exception ex)
+        {
+            mensagem = $"Erro: {ex.Message}";
+        }
+    }
+
+    private static string FormatarFormaPagamento(FormaPagamento fp) => fp switch
+    {
+        FormaPagamento.Dinheiro => "Dinheiro",
+        FormaPagamento.Debito => "Débito",
+        FormaPagamento.Credito => "Crédito",
+        FormaPagamento.Pix => "Pix",
+        FormaPagamento.ValeRefeicao => "Vale Refeição",
+        FormaPagamento.ValeAlimentacao => "Vale Alimentação",
+        _ => fp.ToString()
+    };
+
+    public void Dispose()
+    {
+        Pin.Mudou -= OnPinChanged;
+    }
+}

@@ -1,0 +1,34 @@
+@inherits LayoutComponentBase
+@inject PinState Pin
+@inject NavigationManager Nav
+
+<div class="layout">
+    <nav class="sidebar">
+        <div class="brand">PDV Lujain</div>
+        <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">Caixa</NavLink>
+        <NavLink class="nav-link" href="/cardapio">Cardápio</NavLink>
+        <NavLink class="nav-link" href="/dashboard">Dashboard</NavLink>
+        <NavLink class="nav-link" href="/fechar-caixa">Fechar caixa</NavLink>
+        @if (Pin.Autenticado)
+        {
+            <button class="logout" @onclick="Sair">Sair</button>
+        }
+    </nav>
+    <main class="content">
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    Ocorreu um erro inesperado.
+    <a href="" class="reload">Recarregar</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+@code {
+    private void Sair()
+    {
+        Pin.Limpar();
+        Nav.NavigateTo("/", forceLoad: false);
+    }
+}
